@@ -9,11 +9,16 @@ COPY package*.json ./
 # Step 1: Install all deps WITHOUT scripts (prevents libsignal native build failure)
 RUN npm install --legacy-peer-deps --ignore-scripts
 
-# Step 2: Compile better-sqlite3 from source — prebuilt binary fails on Node 20 ABI
-RUN npm install better-sqlite3@11.10.0 --legacy-peer-deps --build-from-source
+# Step 2: Compile better-sqlite3 native binary directly with node-gyp
+# (--build-from-source flag is not recognized by better-sqlite3's build system)
+RUN cd /app/node_modules/better-sqlite3 && node-gyp rebuild && \
+    echo "=== better-sqlite3 binary OK ===" && \
+    ls -la build/Release/better_sqlite3.node
 
-# Step 3: Remove sharp installed without scripts, then reinstall so the prebuilt binary downloads
-# Do NOT use --platform/--arch flags — let npm auto-detect linux-x64 from the running container
+# Step 3: Install optional modules that ws and node-fetch try to load
+RUN npm install bufferutil encoding --legacy-peer-deps --ignore-scripts || true
+
+# Step 4: Remove sharp installed without scripts, then reinstall so the prebuilt binary downloads
 RUN npm uninstall sharp --legacy-peer-deps && \
     SHARP_IGNORE_GLOBAL_LIBVIPS=1 npm install sharp@0.32.6 --legacy-peer-deps
 
